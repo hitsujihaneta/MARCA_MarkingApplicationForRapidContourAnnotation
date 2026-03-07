@@ -21,3 +21,4 @@
 <img width="1440" height="900" alt="追跡フェーズ" src="https://github.com/user-attachments/assets/a8f2cf34-c4ad-4fec-9670-3e365d48417b" />
 
 
+※今後，モジュール化を検討しております
