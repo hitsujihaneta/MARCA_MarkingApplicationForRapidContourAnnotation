@@ -310,20 +310,20 @@ if __name__ == '__main__':
             color: #777;
             border-color: #4a4a4a;
         }
-        /* Yes/OK側（そのダイアログの既定アクション）は水色で目立たせる。
+        /* Yes/OK側（そのダイアログの既定アクション）を青で目立たせる。
            個別に setStyleSheet() 済みのボタンはそちらが優先されるので影響しない。 */
         QPushButton:default {
-            background-color: #4FC3F7;
-            color: #0a2a3a;
-            border: 1px solid #4FC3F7;
+            background-color: #0a7aff;
+            color: white;
+            border: 1px solid #0a7aff;
             font-weight: bold;
         }
         QPushButton:default:hover {
-            background-color: #74D1FA;
-            border-color: #74D1FA;
+            background-color: #3b95ff;
+            border-color: #3b95ff;
         }
         QPushButton:default:pressed {
-            background-color: #2FA8DE;
+            background-color: #0062d4;
         }
     """)
 

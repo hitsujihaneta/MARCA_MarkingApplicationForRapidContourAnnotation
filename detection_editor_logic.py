@@ -90,12 +90,12 @@ class CoreLogicMixin:
         btn_no.setCursor(QtCore.Qt.PointingHandCursor)
         btn_yes.setCursor(QtCore.Qt.PointingHandCursor)
         # ホバー/押下時にはっきり色が変わるようにする（Fusionダーク標準だと変化が薄く分かりにくいため）。
-        # 基本方針: Yes/OK側（肯定・実行アクション）は常に水色にする。
+        # 基本方針: Yes/OK側（肯定・実行アクション）は常に青にする。
         btn_yes.setStyleSheet(
-            "QPushButton{background-color:#4FC3F7;color:#0a2a3a;border:1px solid #4FC3F7;"
+            "QPushButton{background-color:#0a7aff;color:white;border:1px solid #0a7aff;"
             "border-radius:5px;padding:5px 18px;font-weight:bold;}"
-            "QPushButton:hover{background-color:#74D1FA;border-color:#74D1FA;}"
-            "QPushButton:pressed{background-color:#2FA8DE;}"
+            "QPushButton:hover{background-color:#3b95ff;border-color:#3b95ff;}"
+            "QPushButton:pressed{background-color:#0062d4;}"
         )
         btn_no.setStyleSheet(
             "QPushButton{background-color:#4a4a4a;color:#eee;border:1px solid #666;"
