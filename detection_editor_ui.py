@@ -73,6 +73,11 @@ class UIBuilderMixin:
         self.act_undo.setShortcut("Ctrl+Z")
         self.act_undo.triggered.connect(self.undo_last_operation)
 
+        # --- 更新 メニュー ---
+        update_menu = self.menu_bar.addMenu("🔄 更新")
+        act_check_update = update_menu.addAction("更新を確認...")
+        act_check_update.triggered.connect(self.check_for_updates)
+
     def build_ui(self):
         # メニューバーは __init__ で main_vbox に追加済み
         

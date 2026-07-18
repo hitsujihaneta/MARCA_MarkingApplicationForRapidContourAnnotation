@@ -1812,3 +1812,101 @@ class CoreLogicMixin:
         dlg = LayoutAdjusterDialog(self, self.content_splitter)
         dlg.exec_()
 
+    # ================================================================
+    # 更新確認 (git fetch/pull)
+    # ================================================================
+    def _repo_root(self) -> str:
+        """このスクリプトが置かれているフォルダ（gitリポジトリのルート想定）"""
+        return os.path.dirname(os.path.abspath(__file__))
+
+    def _run_git(self, *args, cwd=None, timeout=30):
+        """gitコマンドを実行し (returncode, stdout, stderr) を返す"""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                cwd=cwd or self._repo_root(),
+                capture_output=True, text=True, timeout=timeout,
+                encoding="utf-8", errors="replace",
+            )
+            return result.returncode, result.stdout.strip(), result.stderr.strip()
+        except FileNotFoundError:
+            return -1, "", "gitコマンドが見つかりません。Gitをインストールしてください。"
+        except Exception as e:
+            return -1, "", str(e)
+
+    def check_for_updates(self):
+        """originのmainブランチと比較し、更新があれば確認のうえpullしてアプリを再起動する"""
+        root = self._repo_root()
+
+        rc, _, _ = self._run_git("rev-parse", "--is-inside-work-tree", cwd=root)
+        if rc != 0:
+            QtWidgets.QMessageBox.warning(
+                self, "更新確認",
+                "このコピーはgit管理されていません。\ngit cloneで取得したフォルダで実行してください。"
+            )
+            return
+
+        rc, _, err = self._run_git("fetch", "origin", "main", cwd=root)
+        if rc != 0:
+            QtWidgets.QMessageBox.warning(self, "更新確認", f"リモートの取得に失敗しました:\n{err}")
+            return
+
+        rc1, local_hash, _ = self._run_git("rev-parse", "HEAD", cwd=root)
+        rc2, remote_hash, _ = self._run_git("rev-parse", "origin/main", cwd=root)
+        if rc1 != 0 or rc2 != 0:
+            QtWidgets.QMessageBox.warning(self, "更新確認", "コミット情報の取得に失敗しました。")
+            return
+
+        if local_hash == remote_hash:
+            QtWidgets.QMessageBox.information(self, "更新確認", "最新版です。")
+            return
+
+        _, log, _ = self._run_git("log", "--oneline", f"{local_hash}..{remote_hash}", cwd=root)
+        n_commits = len(log.splitlines()) if log else 0
+
+        # 未コミットの変更があると更新で壊れる可能性があるため、pull前にチェックする
+        _, dirty, _ = self._run_git("status", "--porcelain", cwd=root)
+        if dirty:
+            QtWidgets.QMessageBox.warning(
+                self, "更新確認",
+                f"更新が{n_commits}件あります:\n\n{log}\n\n"
+                "ただし、このフォルダには未コミットの変更があります。\n"
+                "更新を適用する前に、変更を保存またはコミットしてください。"
+            )
+            return
+
+        reply = QtWidgets.QMessageBox.question(
+            self, "更新確認",
+            f"{n_commits}件の更新があります:\n\n{log}\n\n"
+            "適用しますか？（適用後アプリを再起動します）",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.No
+        )
+        if reply != QtWidgets.QMessageBox.Yes:
+            return
+
+        rc, out, err = self._run_git("pull", "--ff-only", "origin", "main", cwd=root)
+        if rc != 0:
+            QtWidgets.QMessageBox.critical(
+                self, "更新確認",
+                f"更新の適用に失敗しました:\n{err or out}\n\n"
+                "手動で `git pull` を実行して確認してください。"
+            )
+            return
+
+        QtWidgets.QMessageBox.information(self, "更新確認", "更新を適用しました。アプリを再起動します。")
+        self._restart_app()
+
+    def _restart_app(self):
+        """アプリを同じコマンドで再起動する。失敗した場合は手動再起動を促す。"""
+        import sys
+        try:
+            QtWidgets.QApplication.quit()
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(
+                self, "再起動エラー",
+                f"自動再起動に失敗しました:\n{e}\n\nアプリを手動で再起動してください。"
+            )
+
