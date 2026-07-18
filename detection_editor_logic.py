@@ -1835,31 +1835,42 @@ class CoreLogicMixin:
         except Exception as e:
             return -1, "", str(e)
 
-    def check_for_updates(self):
-        """originのmainブランチと比較し、更新があれば確認のうえpullしてアプリを再起動する"""
+    def check_for_updates(self, silent: bool = False):
+        """originのmainブランチと比較し、更新があれば確認のうえpullしてアプリを再起動する。
+
+        silent=True の場合（起動時の自動チェック用）は、更新が無い・確認できない・
+        未コミットの変更があるなど「今アクションできない」状況ではポップアップを出さず、
+        本当に適用可能な更新がある時だけ確認ダイアログを表示する。
+        メニューから手動実行した場合（silent=False）は、どの状況でも結果を知らせる。
+        """
         root = self._repo_root()
 
         rc, _, _ = self._run_git("rev-parse", "--is-inside-work-tree", cwd=root)
         if rc != 0:
-            QtWidgets.QMessageBox.warning(
-                self, "更新確認",
-                "このコピーはgit管理されていません。\ngit cloneで取得したフォルダで実行してください。"
-            )
+            if not silent:
+                QtWidgets.QMessageBox.warning(
+                    self, "更新確認",
+                    "このコピーはgit管理されていません。\ngit cloneで取得したフォルダで実行してください。"
+                )
             return
 
-        rc, _, err = self._run_git("fetch", "origin", "main", cwd=root)
+        # 自動チェック時はネットワークが遅い/繋がらない場合に起動が止まらないよう短めのタイムアウトにする
+        rc, _, err = self._run_git("fetch", "origin", "main", cwd=root, timeout=6 if silent else 30)
         if rc != 0:
-            QtWidgets.QMessageBox.warning(self, "更新確認", f"リモートの取得に失敗しました:\n{err}")
+            if not silent:
+                QtWidgets.QMessageBox.warning(self, "更新確認", f"リモートの取得に失敗しました:\n{err}")
             return
 
         rc1, local_hash, _ = self._run_git("rev-parse", "HEAD", cwd=root)
         rc2, remote_hash, _ = self._run_git("rev-parse", "origin/main", cwd=root)
         if rc1 != 0 or rc2 != 0:
-            QtWidgets.QMessageBox.warning(self, "更新確認", "コミット情報の取得に失敗しました。")
+            if not silent:
+                QtWidgets.QMessageBox.warning(self, "更新確認", "コミット情報の取得に失敗しました。")
             return
 
         if local_hash == remote_hash:
-            QtWidgets.QMessageBox.information(self, "更新確認", "最新版です。")
+            if not silent:
+                QtWidgets.QMessageBox.information(self, "更新確認", "最新版です。")
             return
 
         _, log, _ = self._run_git("log", "--oneline", f"{local_hash}..{remote_hash}", cwd=root)
@@ -1868,18 +1879,20 @@ class CoreLogicMixin:
         # 未コミットの変更があると更新で壊れる可能性があるため、pull前にチェックする
         _, dirty, _ = self._run_git("status", "--porcelain", cwd=root)
         if dirty:
-            QtWidgets.QMessageBox.warning(
-                self, "更新確認",
-                f"更新が{n_commits}件あります:\n\n{log}\n\n"
-                "ただし、このフォルダには未コミットの変更があります。\n"
-                "更新を適用する前に、変更を保存またはコミットしてください。"
-            )
+            if not silent:
+                QtWidgets.QMessageBox.warning(
+                    self, "更新確認",
+                    f"更新が{n_commits}件あります:\n\n{log}\n\n"
+                    "ただし、このフォルダには未コミットの変更があります。\n"
+                    "更新を適用する前に、変更を保存またはコミットしてください。"
+                )
             return
 
+        # ここまで来たら「適用可能な更新がある」ので、silentでも確認ダイアログは出す
         reply = QtWidgets.QMessageBox.question(
-            self, "更新確認",
-            f"{n_commits}件の更新があります:\n\n{log}\n\n"
-            "適用しますか？（適用後アプリを再起動します）",
+            self, "更新の確認",
+            f"新しいバージョンがあります（{n_commits}件の更新）:\n\n{log}\n\n"
+            "更新しますか？（適用後アプリを再起動します）",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No
         )

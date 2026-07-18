@@ -192,6 +192,8 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         if win_handle:
             win_handle.screenChanged.connect(self._on_screen_changed)
         QtCore.QTimer.singleShot(50, self._apply_splitter_ratio)
+        # 起動時に自動で更新確認（更新が無い/確認できない場合は何も表示しない）
+        QtCore.QTimer.singleShot(100, lambda: self.check_for_updates(silent=True))
         QtCore.QTimer.singleShot(200, self._prompt_initial_image_load)
 
     def _apply_splitter_ratio(self):
