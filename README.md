@@ -16,6 +16,18 @@
 - Python / PyQt5
 - .json,.txt,.csvのファイル形式に対応しています
 
+## セットアップ
+```bash
+git clone https://github.com/hitsujihaneta/editor.git
+cd editor
+pip install -r requirements.txt
+python main.py
+```
+
+## 更新の取得
+アプリ内メニューの「🔄 更新 → 更新を確認...」から、リモートの最新コミットを取得して適用できます。
+（ローカルに未コミットの変更がある場合は、安全のため更新は適用されません）
+
 ## イメージ
 <img width="1440" height="900" alt="検出フェーズ" src="https://github.com/user-attachments/assets/46a56456-fb62-4df6-9919-17b4977b97bc" />
 <img width="1440" height="900" alt="追跡フェーズ" src="https://github.com/user-attachments/assets/a8f2cf34-c4ad-4fec-9670-3e365d48417b" />
