@@ -176,16 +176,13 @@ class FileIOMixin:
         既存データが無ければ確認なしでTrueを返す。"""
         if not self.detections:
             return True
-        reply = QtWidgets.QMessageBox.question(
-            self, "確認",
+        return self._ask_confirm(
+            "確認",
             "現在の検出データは保存済みですか？\n"
             "新しいファイルを読み込むと、現在のデータは新しい内容で置き換えられます\n"
             "（保存していない変更は失われます）。\n\n"
-            "続行しますか？",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
+            "続行しますか？"
         )
-        return reply == QtWidgets.QMessageBox.Yes
 
     def _reset_detections_for_new_load(self):
         """新しい検出データを読み込む前に、既存のdetections/id_listを完全にクリアする。
@@ -480,18 +477,10 @@ class FileIOMixin:
     def load_detections_from_txt(self, is_folder: bool):
         # 画像が読み込まれていない場合は画像読み込みを促す
         if not self.image_paths:
-            msg = QtWidgets.QMessageBox(self)
-            msg.setWindowTitle("画像未読み込み")
-            msg.setText("先に画像フォルダを読み込む必要があります。\n今すぐ画像フォルダを選択しますか？")
-            btn_no  = msg.addButton("いいえ", QtWidgets.QMessageBox.RejectRole)
-            btn_yes = msg.addButton("はい",   QtWidgets.QMessageBox.AcceptRole)
-            btn_no.setStyleSheet(
-                "QPushButton{background-color:#0a7aff;color:white;border-radius:5px;padding:4px 16px;}"
-                "QPushButton:hover{background-color:#0062d4;}"
-            )
-            msg.setDefaultButton(btn_no)
-            msg.exec_()
-            if msg.clickedButton() == btn_yes:
+            if self._ask_confirm(
+                "画像未読み込み",
+                "先に画像フォルダを読み込む必要があります。\n今すぐ画像フォルダを選択しますか？"
+            ):
                 self.load_images()
                 # 画像読み込みがキャンセルされた場合は終了
                 if not self.image_paths:

@@ -66,6 +66,41 @@ class CoreLogicMixin:
             return
         self._apply_screen_aware_window_size()
 
+    def _ask_confirm(self, title: str, text: str, yes_text: str = "はい",
+                      no_text: str = "いいえ", yes_default: bool = False) -> bool:
+        """Yes/No確認ダイアログを表示する。
+        QMessageBoxの標準Yes/Noはボタンの役割(Role)を元にOSごとに左右の並びが
+        自動で入れ替わる（Windows/macOSで逆順になる）ため、それを避けて
+        常に左=否定側・右=肯定側で統一した自前レイアウトのダイアログを使う。
+        Yesが選ばれればTrueを返す。"""
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle(title)
+        v = QtWidgets.QVBoxLayout(dlg)
+        lbl = QtWidgets.QLabel(text)
+        lbl.setWordWrap(True)
+        v.addWidget(lbl)
+        v.addSpacing(10)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch(1)
+        btn_no = QtWidgets.QPushButton(no_text)
+        btn_yes = QtWidgets.QPushButton(yes_text)
+        btn_no.setMinimumWidth(80)
+        btn_yes.setMinimumWidth(80)
+        btn_row.addWidget(btn_no)
+        btn_row.addWidget(btn_yes)
+        v.addLayout(btn_row)
+
+        result = {"yes": False}
+        btn_no.clicked.connect(lambda: (result.__setitem__("yes", False), dlg.accept()))
+        btn_yes.clicked.connect(lambda: (result.__setitem__("yes", True), dlg.accept()))
+        if yes_default:
+            btn_yes.setDefault(True)
+        else:
+            btn_no.setDefault(True)
+        dlg.exec_()
+        return result["yes"]
+
     def _play_next_frame(self):
         """再生時に次のフレームに進む"""
         last = len(self.image_paths) - 1
@@ -599,18 +634,10 @@ class CoreLogicMixin:
         if self.is_playing:
             self.toggle_play_pause()
         if not self.image_paths:
-            msg = QtWidgets.QMessageBox(self)
-            msg.setWindowTitle("画像未読み込み")
-            msg.setText("追跡フェーズには画像と検出データが必要です。\n今すぐ画像フォルダを読み込みますか？")
-            btn_no  = msg.addButton("いいえ", QtWidgets.QMessageBox.RejectRole)
-            btn_yes = msg.addButton("はい",   QtWidgets.QMessageBox.AcceptRole)
-            btn_no.setStyleSheet(
-                "QPushButton{background-color:#0a7aff;color:white;border-radius:5px;padding:4px 16px;}"
-                "QPushButton:hover{background-color:#0062d4;}"
-            )
-            msg.setDefaultButton(btn_no)
-            msg.exec_()
-            if msg.clickedButton() == btn_yes:
+            if self._ask_confirm(
+                "画像未読み込み",
+                "追跡フェーズには画像と検出データが必要です。\n今すぐ画像フォルダを読み込みますか？"
+            ):
                 self.load_images()
             if not self.image_paths:
                 return
@@ -1001,18 +1028,7 @@ class CoreLogicMixin:
 
     def delete_all_for_id(self, target_id: str):
         """指定IDの枠・IDリスト・カラーマップを全て削除"""
-        msg = QtWidgets.QMessageBox(self)
-        msg.setWindowTitle("確認")
-        msg.setText(f"ID '{target_id}' を本当に削除しますか？")
-        btn_no  = msg.addButton("いいえ", QtWidgets.QMessageBox.RejectRole)
-        btn_yes = msg.addButton("はい",   QtWidgets.QMessageBox.AcceptRole)
-        btn_no.setStyleSheet(
-            "QPushButton{background-color:#0a7aff;color:white;border-radius:5px;padding:4px 16px;}"
-            "QPushButton:hover{background-color:#0062d4;}"
-        )
-        msg.setDefaultButton(btn_no)
-        msg.exec_()
-        if msg.clickedButton() != btn_yes:
+        if not self._ask_confirm("確認", f"ID '{target_id}' を本当に削除しますか？"):
             return
 
         for frame_number, boxes in self.detections.items():
@@ -1772,25 +1788,20 @@ class CoreLogicMixin:
 
     # -------- JSON形式で保存 (フレームごと) --------
     def _prompt_initial_image_load(self):
-        msg = QtWidgets.QMessageBox(self)
-        msg.setIcon(QtWidgets.QMessageBox.Question)
-        msg.setWindowTitle("初期読み込み")
-        msg.setText("画像フォルダを読み込みますか？")
-        msg.setInformativeText("開始するには、まず画像フォルダを選択してください。")
-        btn_no  = msg.addButton("No",  QtWidgets.QMessageBox.RejectRole)
-        btn_yes = msg.addButton("Yes", QtWidgets.QMessageBox.AcceptRole)
-        btn_no.setStyleSheet(
-            "QPushButton{background-color:#0a7aff;color:white;border-radius:5px;padding:4px 16px;}"
-            "QPushButton:hover{background-color:#0062d4;}"
-        )
-        btn_yes.setStyleSheet(
-            "QPushButton{background-color:#6c6c6c;color:white;border-radius:5px;padding:4px 16px;}"
-            "QPushButton:hover{background-color:#555;}"
-        )
-        msg.setDefaultButton(btn_no)
-        msg.exec_()
-        if msg.clickedButton() == btn_yes:
+        if self._ask_confirm(
+            "初期読み込み",
+            "画像フォルダを読み込みますか？\n開始するには、まず画像フォルダを選択してください。",
+            yes_text="Yes", no_text="No",
+        ):
             self.load_images()
+
+    def _startup_update_check_then_prompt(self):
+        """起動時の更新チェック → アプリを再起動する場合以外は画像読み込みを促す。
+        更新チェックで確認ダイアログが出ている間は、画像読み込みポップアップを
+        同時に出さないようにするため、更新チェックの完了を待ってから呼び出す。"""
+        restarting = self.check_for_updates(silent=True)
+        if not restarting:
+            self._prompt_initial_image_load()
 
     # ================================================================
     # 画像読み込み後ダイアログ（追跡データ読み込みを促す）
@@ -1835,7 +1846,7 @@ class CoreLogicMixin:
         except Exception as e:
             return -1, "", str(e)
 
-    def check_for_updates(self, silent: bool = False):
+    def check_for_updates(self, silent: bool = False) -> bool:
         """originのmainブランチと比較し、更新があれば確認のうえpullしてアプリを再起動する。
 
         silent=True の場合（起動時の自動チェック用）は、更新が無い・確認できない・
@@ -1845,6 +1856,8 @@ class CoreLogicMixin:
 
         どちらの場合も「確認中」であることが分かるよう、
         メニューの表示を一時的に「更新を確認中...」に変え、待機カーソルを出す。
+
+        戻り値: 更新を適用してアプリの再起動処理に入った場合True、それ以外はFalse。
         """
         act = getattr(self, 'act_check_update', None)
         orig_text = act.text() if act else None
@@ -1854,14 +1867,15 @@ class CoreLogicMixin:
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         QtWidgets.QApplication.processEvents()
         try:
-            self._check_for_updates_impl(silent=silent)
+            return self._check_for_updates_impl(silent=silent)
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
             if act:
                 act.setEnabled(True)
                 act.setText(orig_text)
 
-    def _check_for_updates_impl(self, silent: bool):
+    def _check_for_updates_impl(self, silent: bool) -> bool:
+        """戻り値: 更新を適用してアプリの再起動処理に入ればTrue、それ以外はFalse。"""
         root = self._repo_root()
 
         rc, _, _ = self._run_git("rev-parse", "--is-inside-work-tree", cwd=root)
@@ -1871,26 +1885,26 @@ class CoreLogicMixin:
                     self, "更新確認",
                     "このコピーはgit管理されていません。\ngit cloneで取得したフォルダで実行してください。"
                 )
-            return
+            return False
 
         # 自動チェック時はネットワークが遅い/繋がらない場合に起動が止まらないよう短めのタイムアウトにする
         rc, _, err = self._run_git("fetch", "origin", "main", cwd=root, timeout=6 if silent else 30)
         if rc != 0:
             if not silent:
                 QtWidgets.QMessageBox.warning(self, "更新確認", f"リモートの取得に失敗しました:\n{err}")
-            return
+            return False
 
         rc1, local_hash, _ = self._run_git("rev-parse", "HEAD", cwd=root)
         rc2, remote_hash, _ = self._run_git("rev-parse", "origin/main", cwd=root)
         if rc1 != 0 or rc2 != 0:
             if not silent:
                 QtWidgets.QMessageBox.warning(self, "更新確認", "コミット情報の取得に失敗しました。")
-            return
+            return False
 
         if local_hash == remote_hash:
             if not silent:
                 QtWidgets.QMessageBox.information(self, "更新確認", "最新版です。")
-            return
+            return False
 
         _, log, _ = self._run_git("log", "--oneline", f"{local_hash}..{remote_hash}", cwd=root)
         n_commits = len(log.splitlines()) if log else 0
@@ -1905,18 +1919,17 @@ class CoreLogicMixin:
                     "ただし、このフォルダには未コミットの変更があります。\n"
                     "更新を適用する前に、変更を保存またはコミットしてください。"
                 )
-            return
+            return False
 
         # ここまで来たら「適用可能な更新がある」ので、silentでも確認ダイアログは出す
-        reply = QtWidgets.QMessageBox.question(
-            self, "更新の確認",
+        # （右=更新する・左=更新しない で統一。QMessageBox標準Yes/NoはOSごとに左右が入れ替わるため使わない）
+        if not self._ask_confirm(
+            "更新の確認",
             f"新しいバージョンがあります（{n_commits}件の更新）:\n\n{log}\n\n"
             "更新しますか？（適用後アプリを再起動します）",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No
-        )
-        if reply != QtWidgets.QMessageBox.Yes:
-            return
+            yes_text="更新する", no_text="更新しない",
+        ):
+            return False
 
         rc, out, err = self._run_git("pull", "--ff-only", "origin", "main", cwd=root)
         if rc != 0:
@@ -1925,10 +1938,11 @@ class CoreLogicMixin:
                 f"更新の適用に失敗しました:\n{err or out}\n\n"
                 "手動で `git pull` を実行して確認してください。"
             )
-            return
+            return False
 
         QtWidgets.QMessageBox.information(self, "更新確認", "更新を適用しました。アプリを再起動します。")
         self._restart_app()
+        return True
 
     def _restart_app(self):
         """アプリを同じコマンドで再起動する。失敗した場合は手動再起動を促す。"""

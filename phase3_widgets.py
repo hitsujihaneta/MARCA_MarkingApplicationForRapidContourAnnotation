@@ -637,25 +637,40 @@ class P3Timeline(QGraphicsView):
             src_lane, s, e_ = self.sel1
             dst_lane = self.hover_lane
             if dst_lane is not None and dst_lane != src_lane:
-                # Cancel(左・青) / Yes(右・灰)
-                _dlg = QMessageBox(self)
-                _dlg.setWindowTitle("入れ替え確認")
+                # Cancel(左) / Yes(右) で固定。QMessageBoxの標準Yes/NoはOSごとに
+                # 左右が入れ替わる（Windows/macOSで逆順になる）ため、自前レイアウトにする。
                 src_id = self.lanes[src_lane].id_value if src_lane < len(self.lanes) else str(src_lane + 1)
                 dst_id = self.lanes[dst_lane].id_value if dst_lane < len(self.lanes) else str(dst_lane + 1)
-                _dlg.setText(f"区間 {s}〜{e_-1} を ID{src_id} ⇔ ID{dst_id} で入れ替えますか？")
-                _btn_yes    = _dlg.addButton("Yes",    QMessageBox.AcceptRole)
-                _btn_cancel = _dlg.addButton("Cancel", QMessageBox.RejectRole)
-                _btn_yes.setStyleSheet(
-                    "QPushButton{background-color:#6c6c6c;color:white;border-radius:5px;padding:4px 16px;}"
-                    "QPushButton:hover{background-color:#555;}"
-                )
+
+                _dlg = QtWidgets.QDialog(self)
+                _dlg.setWindowTitle("入れ替え確認")
+                _v = QVBoxLayout(_dlg)
+                _lbl = QLabel(f"区間 {s}〜{e_-1} を ID{src_id} ⇔ ID{dst_id} で入れ替えますか？")
+                _lbl.setWordWrap(True)
+                _v.addWidget(_lbl)
+                _v.addSpacing(10)
+                _btn_row = QHBoxLayout()
+                _btn_row.addStretch(1)
+                _btn_cancel = QPushButton("Cancel")
+                _btn_yes = QPushButton("Yes")
                 _btn_cancel.setStyleSheet(
                     "QPushButton{background-color:#0a7aff;color:white;border-radius:5px;padding:4px 16px;}"
                     "QPushButton:hover{background-color:#0062d4;}"
                 )
-                _dlg.setDefaultButton(_btn_cancel)
+                _btn_yes.setStyleSheet(
+                    "QPushButton{background-color:#6c6c6c;color:white;border-radius:5px;padding:4px 16px;}"
+                    "QPushButton:hover{background-color:#555;}"
+                )
+                _btn_row.addWidget(_btn_cancel)
+                _btn_row.addWidget(_btn_yes)
+                _v.addLayout(_btn_row)
+                _btn_cancel.setDefault(True)
+
+                _result = {"yes": False}
+                _btn_cancel.clicked.connect(lambda: (_result.__setitem__("yes", False), _dlg.accept()))
+                _btn_yes.clicked.connect(lambda: (_result.__setitem__("yes", True), _dlg.accept()))
                 _dlg.exec_()
-                if _dlg.clickedButton() == _btn_yes:
+                if _result["yes"]:
                     self.swapRequested.emit(src_lane, dst_lane, s, e_)
                 else:
                     self.dragging_sel = False
