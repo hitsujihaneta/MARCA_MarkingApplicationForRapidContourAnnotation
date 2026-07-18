@@ -17,12 +17,37 @@
 - .json,.txt,.csvのファイル形式に対応しています
 
 ## セットアップ
+
+### 事前準備: Git
+`git clone`とアプリ内の更新確認機能に必要です。未インストールの場合は先に入れてください。
+
+- **Windows**: `winget install --id Git.Git -e --source winget`
+  （`winget`が使えない場合は [git-scm.com](https://git-scm.com/download/win) からインストーラーを取得）
+- **Mac**: 通常はプリインストール済みです。無い場合はターミナルで`git`と打つとインストールを促されます
+  （もしくは `brew install git`）
+
+インストール後は、ターミナル / Anaconda Promptを一度閉じて開き直してください（PATHの変更を反映させるため）。
+
+### クローンして起動
 ```bash
 git clone https://github.com/hitsujihaneta/editor.git
 cd editor
 pip install -r requirements.txt
 python main.py
 ```
+
+### 一撃起動スクリプト
+毎回コマンドを打たなくても、同梱の起動スクリプトをダブルクリックするだけで起動できます。
+
+- **Windows**: `start.bat` をダブルクリック
+- **Mac**: `start.command` をダブルクリック
+  - 初回のみ、ターミナルで実行権限を付与する必要があります:
+    ```bash
+    chmod +x start.command
+    ```
+    （Finderからのダブルクリックだけでは実行できないための一回限りの準備です）
+
+どちらも conda環境 `labelme` があれば自動で使い、無ければシステムのPython(`python3`)にフォールバックします。
 
 ## 更新の取得
 アプリ内メニューの「🔄 更新 → 更新を確認...」から、リモートの最新コミットを取得して適用できます。
