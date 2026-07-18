@@ -270,6 +270,32 @@ if __name__ == '__main__':
     dark_palette.setColor(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText, QtGui.QColor(127, 127, 127))
     app.setPalette(dark_palette)
 
+    # 個別にスタイル指定していないボタン（「画像フォルダを選択」など）は、
+    # ダークパレットのButton色だけだと周囲の背景と馴染みすぎて見づらいため、
+    # 全体に共通の枠線・ホバー/押下フィードバックを付ける。
+    # ウィジェット側で setStyleSheet() 済みのボタンはそちらが優先される。
+    app.setStyleSheet("""
+        QPushButton {
+            background-color: #4a4a4a;
+            color: #eee;
+            border: 1px solid #6a6a6a;
+            border-radius: 4px;
+            padding: 4px 10px;
+        }
+        QPushButton:hover {
+            background-color: #5c5c5c;
+            border-color: #8a8a8a;
+        }
+        QPushButton:pressed {
+            background-color: #3a3a3a;
+        }
+        QPushButton:disabled {
+            background-color: #3a3a3a;
+            color: #777;
+            border-color: #4a4a4a;
+        }
+    """)
+
     # ベースフォントはポイント指定（DPIに追随）
     base_font = QtGui.QFont("Noto Sans JP", 10)
     app.setFont(base_font)

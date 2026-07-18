@@ -89,19 +89,26 @@ class CoreLogicMixin:
         btn_yes.setMinimumWidth(80)
         btn_no.setCursor(QtCore.Qt.PointingHandCursor)
         btn_yes.setCursor(QtCore.Qt.PointingHandCursor)
-        # ホバー/押下時にはっきり色が変わるようにする（Fusionダーク標準だと変化が薄く分かりにくいため）
-        btn_no.setStyleSheet(
-            "QPushButton{background-color:#4a4a4a;color:#eee;border:1px solid #666;"
-            "border-radius:5px;padding:5px 18px;}"
-            "QPushButton:hover{background-color:#666;border-color:#888;}"
-            "QPushButton:pressed{background-color:#3a3a3a;}"
-        )
-        btn_yes.setStyleSheet(
+        # ホバー/押下時にはっきり色が変わるようにする（Fusionダーク標準だと変化が薄く分かりにくいため）。
+        # このアプリの慣習に合わせ、実際のデフォルトボタン（Enterで選ばれる方）を青にする。
+        _accent_style = (
             "QPushButton{background-color:#0a7aff;color:white;border:1px solid #0a7aff;"
             "border-radius:5px;padding:5px 18px;}"
             "QPushButton:hover{background-color:#3b95ff;border-color:#3b95ff;}"
             "QPushButton:pressed{background-color:#0062d4;}"
         )
+        _neutral_style = (
+            "QPushButton{background-color:#4a4a4a;color:#eee;border:1px solid #666;"
+            "border-radius:5px;padding:5px 18px;}"
+            "QPushButton:hover{background-color:#666;border-color:#888;}"
+            "QPushButton:pressed{background-color:#3a3a3a;}"
+        )
+        if yes_default:
+            btn_yes.setStyleSheet(_accent_style)
+            btn_no.setStyleSheet(_neutral_style)
+        else:
+            btn_no.setStyleSheet(_accent_style)
+            btn_yes.setStyleSheet(_neutral_style)
         btn_row.addWidget(btn_no)
         btn_row.addWidget(btn_yes)
         v.addLayout(btn_row)
