@@ -61,7 +61,7 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         super().__init__()
         # ストアを最初に生成（プロパティアクセスより前に必要）
         self.store = EditorStore()
-        self.setWindowTitle("PyQt Detection Editor (手動保存 / JSON・TXT対応 + 可変ID + 出場区間)")
+        self.setWindowTitle("MARCA - Marking Application for Rapid Contour Annotation")
         
         # QWidgetをメインウィンドウとして使うため、メニューバーを縦レイアウトのトップに追加
         self.main_vbox = QtWidgets.QVBoxLayout(self)

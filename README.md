@@ -1,4 +1,4 @@
-# editor
+# MARCA — Marking Application for Rapid Contour Annotation
 バウンディングボックス編集ツール
 検出と追跡結果を手動で補正・可視化するツールです。
 
@@ -30,8 +30,8 @@
 
 ### クローンして起動
 ```bash
-git clone https://github.com/hitsujihaneta/editor.git
-cd editor
+git clone https://github.com/hitsujihaneta/MARCA_MarkingApplicationForRapidContourAnnotation.git
+cd MARCA_MarkingApplicationForRapidContourAnnotation
 pip install -r requirements.txt
 python main.py
 ```
