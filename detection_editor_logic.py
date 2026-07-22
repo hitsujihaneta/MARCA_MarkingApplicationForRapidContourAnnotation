@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
 )
 from dialogs import IntervalEditor, FPSSettingsDialog, LayoutAdjusterDialog
 from models import _HEX_PALETTE, Interval, _PHASE3_AVAILABLE, handle_view_wheel, \
-    zoom_combo_value, apply_tracking_zoom
+    zoom_combo_value, apply_tracking_zoom, natural_sort_key
 
 
 class CoreLogicMixin:
@@ -1579,6 +1579,14 @@ class CoreLogicMixin:
             return super().eventFilter(source, event)
 
         return super().eventFilter(source, event)
+
+    def _resort_id_list(self):
+        """self.id_list を自然順（昇順）で並べ直す。
+        サイドバーは表示のたびに独自に並べ替えていたため見た目は昇順に見えていたが、
+        id_list自体は追加順のままだったため、それを直接参照する追跡フェーズ（Phase3）
+        では順序がバラつくことがあった。id_listの実体を常に並べ替えておくことで、
+        参照元によらず常に昇順になるようにする。"""
+        self.id_list.sort(key=natural_sort_key)
 
     def _ensure_color_map(self):
         used = {idx for id_, idx in self.id_color_map.items() if id_ in self.id_list and 0 <= idx < len(self.palette)}

@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from PyQt5.QtCore import Qt
@@ -9,6 +10,13 @@ _PHASE3_AVAILABLE = True
 FrameNumber = int
 BoxList = List[object]  # [x, y, w, h, label(str)]  ← 型エイリアス（dataclass Box と区別）
 Interval = List[Optional[int]]  # [start_frame_number, end_frame_number_or_None]
+
+
+def natural_sort_key(s):
+    """ID文字列を自然順（"2" < "10"、"GK1" < "GK10"）で並べるためのソートキー。
+    id_listの並び順を常にこのキーで統一することで、サイドバー・追跡フェーズなど
+    どこで表示してもID順がバラつかないようにする。"""
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', str(s))]
 
 
 # =====================================================================

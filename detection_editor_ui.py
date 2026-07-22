@@ -1,4 +1,3 @@
-import re
 from typing import Dict, List, Optional, Tuple
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt
@@ -716,6 +715,10 @@ class UIBuilderMixin:
 
     # ---- 進捗/範囲 ----
     def rebuild_id_list_ui(self):
+        # id_list自体を常に昇順で保つ（追跡フェーズなど、id_listを直接参照する箇所でも
+        # 常に昇順になるようにするため。ここでの並べ替えは表示用コピーではなく実体に対して行う）
+        self._resort_id_list()
+
         if not hasattr(self, 'id_scroll_layout'):
             return # loaded_ui がまだ構築されていない場合はスキップ
 
@@ -729,10 +732,7 @@ class UIBuilderMixin:
 
         self._ensure_color_map()
 
-        # IDボタンの最小幅を設定
-        def _natural_key(s):
-            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', str(s))]
-        sorted_ids = sorted(self.id_list, key=_natural_key)
+        sorted_ids = self.id_list  # 既に自然順で並んでいる
 
         fm_global = self.fontMetrics()
         widest_text = ""
