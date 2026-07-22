@@ -165,6 +165,11 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         self.undo_stack: List[Dict] = []  # 操作履歴スタック
         self.max_undo_history: int = 50  # 最大Undo回数
 
+        # クラッシュ復元用の自動バックアップ（画像フォルダ内に隠しファイルとして定期保存）
+        self._autosave_timer = QTimer()
+        self._autosave_timer.timeout.connect(self._autosave_recovery)
+        self._autosave_timer.start(120000)  # 2分ごと
+
         # フェーズ管理
         self.current_phase: int = 1  # 1〜4
         self.label_check_mode: bool = False  # ラベルチェックモード ON/OFF

@@ -17,6 +17,83 @@ class FileIOMixin:
     def _mark_saved(self):
         """保存が成功した時刻を記録する（終了時の保存確認に使用）"""
         self._last_save_time = time.time()
+        # 正式に保存できたので、クラッシュ復元用の自動保存データはもう不要
+        self._clear_recovery_file()
+
+    # ================================================================
+    # クラッシュ復元用の自動バックアップ
+    # 画像フォルダ内に隠しファイルとして定期保存し、正式な保存とは別に
+    # 直近の作業内容を残しておく（アプリが落ちても直前の状態まで復元できるように）。
+    # ================================================================
+    def _recovery_file_path(self) -> Optional[str]:
+        if not self.image_folder:
+            return None
+        return os.path.join(self.image_folder, ".marca_autosave.json")
+
+    def _autosave_recovery(self):
+        """一定間隔で自動的に呼ばれ、作業内容を裏で保存する。
+        バックグラウンド処理なので、失敗しても画面には出さない。"""
+        if not self.image_folder or not self.detections:
+            return
+        path = self._recovery_file_path()
+        if not path:
+            return
+        try:
+            data = {
+                "saved_at": time.time(),
+                "detections": {str(k): v for k, v in self.detections.items()},
+                "id_list": self.id_list,
+                "id_intervals": self.id_intervals,
+                "hidden_ids": list(self.hidden_ids),
+            }
+            tmp_path = path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            os.replace(tmp_path, path)  # アトミックに置き換え、書き込み中のクラッシュでファイルが壊れないようにする
+        except Exception:
+            pass
+
+    def _clear_recovery_file(self):
+        path = self._recovery_file_path()
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+    def _check_recovery_on_load(self):
+        """画像フォルダ読み込み時、自動保存の復元データが見つかれば復元するか確認する。"""
+        path = self._recovery_file_path()
+        if not path or not os.path.exists(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return
+
+        saved_at = data.get("saved_at")
+        when_text = ""
+        if saved_at:
+            when_text = datetime.datetime.fromtimestamp(saved_at).strftime("%Y-%m-%d %H:%M")
+
+        if not self._ask_confirm(
+            "自動保存データが見つかりました",
+            "保存されないまま終了した可能性がある作業内容が見つかりました"
+            f"{'（' + when_text + ' 時点）' if when_text else ''}。\n復元しますか？",
+            yes_text="復元する", no_text="復元しない",
+        ):
+            return
+
+        try:
+            self.detections = {int(k): v for k, v in data.get("detections", {}).items()}
+            self.id_list = data.get("id_list", self.id_list)
+            self.id_intervals = data.get("id_intervals", self.id_intervals)
+            self.hidden_ids = set(data.get("hidden_ids", []))
+            self.loaded_frames = set(self.detections.keys())
+            self.rebuild_id_list_ui()
+        except Exception as e:
+            QtWidgets.QMessageBox.warning(self, "復元エラー", f"自動保存データの復元に失敗しました:\n{e}")
 
     def _json_path_for_image(self, img_path: str):
         return os.path.splitext(img_path)[0] + ".json"
@@ -597,6 +674,9 @@ class FileIOMixin:
             QtWidgets.QApplication.processEvents()
             QtCore.QThread.msleep(200)
             progress.close()
+
+        # 通常の読み込みが終わった後、より新しい自動保存データが無いか確認する
+        self._check_recovery_on_load()
 
         # 画像読み込み成功後、操作UIに切り替える
         self.sidebar_stack.setCurrentIndex(1)
