@@ -3,6 +3,7 @@ import os
 import re
 import hashlib
 import time
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import Qt, QTimer
@@ -770,7 +771,7 @@ class CoreLogicMixin:
         line_edit.returnPressed.connect(dlg.accept)
         if dlg.exec_() != QtWidgets.QDialog.Accepted:
             return
-        new_id = line_edit.text().strip()
+        new_id = unicodedata.normalize("NFKC", line_edit.text().strip())  # 全角入力を半角に正規化
         if not re.fullmatch(r"[A-Za-z0-9]+", new_id):
             QtWidgets.QMessageBox.warning(self, "無効なID", "英数字のみで入力してください。")
             return
