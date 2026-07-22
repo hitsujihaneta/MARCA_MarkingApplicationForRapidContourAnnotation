@@ -1410,7 +1410,9 @@ class CoreLogicMixin:
                     return True
 
             # 既存ボックスの移動ドラッグ
-            if self._moving_box_index is not None and self.mode == "edit":
+            # （編集モードでの左ドラッグ、または中クリック[スクロールボタン]ドラッグは
+            #  モードによらず枠移動を許可する）
+            if self._moving_box_index is not None and (self.mode == "edit" or self._moving_via_middle):
                 vp_dx = event.pos().x() - self._press_pos_viewport.x()
                 vp_dy = event.pos().y() - self._press_pos_viewport.y()
                 if not self._is_dragging_box and vp_dx * vp_dx + vp_dy * vp_dy > 9:
@@ -1456,6 +1458,24 @@ class CoreLogicMixin:
             if event.button() == QtCore.Qt.RightButton:
                 self._pan_start = event.pos()
                 self.view.viewport().setCursor(QtCore.Qt.ClosedHandCursor)
+                return True
+            if event.button() == QtCore.Qt.MiddleButton:
+                # 中クリック（スクロールボタン）押し込み：モードによらず枠移動を開始
+                # （選択モードでも枠を移動できるようにするため。クリックのみ＝ドラッグなしの場合は
+                #  何もしない。削除はしない）
+                pos = self.view.mapToScene(event.pos())
+                boxes = self.detections.get(frame_id, [])
+                self._press_pos_viewport = event.pos()
+                for i, (x, y, w, h, lbl) in enumerate(boxes):
+                    if lbl in self.hidden_ids:
+                        continue
+                    if x <= pos.x() <= x + w and y <= pos.y() <= y + h:
+                        self._moving_box_index = i
+                        self._moving_box_original = boxes[i][:]
+                        self._moving_press_scene = pos
+                        self._is_dragging_box = False
+                        self._moving_via_middle = True
+                        break
                 return True
             if event.button() == QtCore.Qt.LeftButton:
                 pos = self.view.mapToScene(event.pos())
@@ -1509,7 +1529,10 @@ class CoreLogicMixin:
                 self._pan_start = None
                 self.view.viewport().setCursor(QtCore.Qt.ArrowCursor)
                 return True
-            if event.button() == QtCore.Qt.LeftButton and self._moving_box_index is not None:
+            if (
+                (event.button() == QtCore.Qt.LeftButton and not self._moving_via_middle)
+                or (event.button() == QtCore.Qt.MiddleButton and self._moving_via_middle)
+            ) and self._moving_box_index is not None:
                 # ゴースト矩形を削除
                 if self._moving_ghost is not None and self._moving_ghost.scene() == self.scene:
                     self.scene.removeItem(self._moving_ghost)
@@ -1527,16 +1550,18 @@ class CoreLogicMixin:
                     boxes[self._moving_box_index][1] = oy + dy
                     self.detections[frame_id] = boxes
                     self._quick_redraw_boxes()
-                else:
-                    # クリックのみ → 削除
+                elif not self._moving_via_middle:
+                    # クリックのみ（左ドラッグ/編集モード）→ 削除
                     self._save_undo_state("BBox削除")
                     boxes.pop(self._moving_box_index)
                     self.detections[frame_id] = boxes
                     self._quick_redraw_boxes()
+                # 中クリック（選択モード）でクリックのみの場合は何もしない（削除しない）
 
                 self._moving_box_index = None
                 self._moving_box_original = None
                 self._moving_press_scene = None
+                self._moving_via_middle = False
                 self._is_dragging_box = False
                 self._press_pos_viewport = None
                 return True

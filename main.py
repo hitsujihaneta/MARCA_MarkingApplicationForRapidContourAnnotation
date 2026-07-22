@@ -145,6 +145,7 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         self._moving_press_scene: Optional[QtCore.QPointF] = None  # ドラッグ開始シーン座標
         self._moving_ghost: Optional[QtWidgets.QGraphicsRectItem] = None  # 移動プレビュー矩形
         self._is_dragging_box: bool = False                   # 実際にドラッグ中かどうか
+        self._moving_via_middle: bool = False                 # 中クリック（スクロールボタン）での移動中かどうか
         # --- hover highlight ---
         self.hover_item: Optional[QtWidgets.QGraphicsRectItem] = None
         self.hover_box_index: Optional[int] = None
