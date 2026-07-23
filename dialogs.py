@@ -1,11 +1,45 @@
 from typing import List, Optional
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtWidgets import (
     QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QMessageBox,
     QPushButton, QSlider, QSplitter, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
 from models import Interval
+
+
+class IDVisibilityToggle(QtWidgets.QAbstractButton):
+    """ID表示/編集可否の切り替えスイッチ。
+    右＝ON（編集可能、丸は不透明）／左＝OFF（編集不可、丸は半透明）を
+    丸の左右位置で示す（見た目だけの違い。色の変化のみだった旧「●」ボタンより分かりやすくするため）。"""
+
+    def __init__(self, checked: bool, color: QtGui.QColor, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setChecked(checked)
+        self._color = QtGui.QColor(color)
+        self.setFixedSize(30, 16)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+
+    def paintEvent(self, _event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+
+        rect = self.rect()
+        track_h = rect.height()
+        painter.setBrush(QtGui.QColor(70, 70, 70))
+        painter.drawRoundedRect(QtCore.QRectF(0, 0, rect.width(), track_h), track_h / 2, track_h / 2)
+
+        knob_d = track_h - 4
+        knob_travel = rect.width() - knob_d - 4
+        knob_x = (2 + knob_travel) if self.isChecked() else 2
+        knob_color = QtGui.QColor(self._color)
+        knob_color.setAlpha(255 if self.isChecked() else 102)
+        painter.setBrush(knob_color)
+        painter.drawEllipse(QtCore.QRectF(knob_x, 2, knob_d, knob_d))
+        painter.end()
+
 
 class IntervalEditor(QtWidgets.QDialog):
     """簡易な出場区間(Intervals)編集ダイアログ。"""

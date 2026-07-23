@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from phase3_widgets import Phase3Widget
 from models import _PHASE3_AVAILABLE, ZOOM_PRESETS, ZOOM_DEFAULT_TEXT
-from dialogs import FPSSettingsDialog, LayoutAdjusterDialog, IntervalEditor
+from dialogs import FPSSettingsDialog, LayoutAdjusterDialog, IntervalEditor, IDVisibilityToggle
 
 
 class UIBuilderMixin:
@@ -758,22 +758,14 @@ class UIBuilderMixin:
             btn.clicked.connect(lambda _, x=id_: self.set_id(x))
             h.addWidget(btn)
 
-            # 表示/非表示トグルボタン（IDボタンとフレーム進捗の間）
+            # 表示/編集可否トグルスイッチ（IDボタンとフレーム進捗の間）
+            # 右＝ON（編集可能）／左＝OFF（編集不可、丸は半透明）
             is_visible = id_ not in self.hidden_ids
             id_color = self.color_for(id_)
-            vis_btn = QtWidgets.QPushButton("●")
-            vis_btn.setFixedSize(22, 24)
-            vis_btn.setToolTip("表示/非表示を切り替え")
-            vis_btn.setStyleSheet(
-                f"QPushButton{{color:{id_color.name()}; font-size:13px;"
-                f" padding:0; margin:0; border:none; background:transparent;}}"
-            )
-            if not is_visible:
-                effect = QtWidgets.QGraphicsOpacityEffect()
-                effect.setOpacity(0.4)
-                vis_btn.setGraphicsEffect(effect)
+            vis_btn = IDVisibilityToggle(is_visible, id_color)
+            vis_btn.setToolTip("編集可能/編集不可を切り替え")
             vis_btn.clicked.connect(lambda _, x=id_: self._toggle_id_visibility(x))
-            h.addWidget(vis_btn)
+            h.addWidget(vis_btn, 0, QtCore.Qt.AlignVCenter)
 
             # 進捗ラベル（フレーム数の桁数に合わせた幅）
             done, denom = self._progress_for_id(id_)
