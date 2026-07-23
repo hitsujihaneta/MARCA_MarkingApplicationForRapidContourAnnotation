@@ -25,7 +25,10 @@ class UIBuilderMixin:
 
         # 開く
         act_load_img = file_menu.addAction("📂 画像フォルダを選択")
-        act_load_det = file_menu.addMenu("📄 検出結果を読み込み")
+        # 「検出結果を読み込み」はホバーで開くカスケード式サブメニューだと
+        # マウス操作で選びにくい（少しでも動きがずれると閉じてしまう）という声があったため、
+        # 通常のクリックで「確定」してから独立したポップアップメニューを開く形にする。
+        act_load_det = file_menu.addAction("📄 検出結果を読み込み ▸")
         file_menu.addSeparator()
 
         # 保存
@@ -42,14 +45,20 @@ class UIBuilderMixin:
         save_menu.addSeparator()
         act_export_all       = save_menu.addAction("📦 一括エクスポート (CSV + TXT + JSON)...")
 
-        # 読み込みサブメニュー
-        act_load_det_file   = act_load_det.addAction("📄 TXTファイル（全フレーム一括）")
-        act_load_det_folder = act_load_det.addAction("📁 TXTフォルダ（フレームごと）")
-        act_load_det.addSeparator()
-        act_load_csv        = act_load_det.addAction("📊 CSVファイル (frame,id,x1,y1,x2,y2)")
-        act_load_json_folder = act_load_det.addAction("🗂 LabelMe JSONフォルダ")
-        act_load_det.addSeparator()
-        act_load_deepocsort = act_load_det.addAction("🎯 DeepOCSORT形式 (frame,id,x,y,w,h,conf,cls,vis)")
+        # 読み込み形式選択メニュー（「検出結果を読み込み」クリックで独立したポップアップとして開く）
+        self.load_det_menu = QtWidgets.QMenu(self)
+        act_load_det_file   = self.load_det_menu.addAction("📄 TXTファイル（全フレーム一括）")
+        act_load_det_folder = self.load_det_menu.addAction("📁 TXTフォルダ（フレームごと）")
+        self.load_det_menu.addSeparator()
+        act_load_csv        = self.load_det_menu.addAction("📊 CSVファイル (frame,id,x1,y1,x2,y2)")
+        act_load_json_folder = self.load_det_menu.addAction("🗂 LabelMe JSONフォルダ")
+        self.load_det_menu.addSeparator()
+        act_load_deepocsort = self.load_det_menu.addAction("🎯 DeepOCSORT形式 (frame,id,x,y,w,h,conf,cls,vis)")
+
+        def _open_load_det_menu():
+            pos = QtGui.QCursor.pos()
+            self.load_det_menu.exec_(pos)
+        act_load_det.triggered.connect(_open_load_det_menu)
 
         # 接続
         act_load_img.triggered.connect(self.load_images)
@@ -795,10 +804,10 @@ class UIBuilderMixin:
                 b.clicked.connect(cb)
                 return b
 
+            h.addWidget(mk("➡",   lambda _, x=id_: self.jump_to_unassigned_frame(x), "未付与フレームへ"), 1)
             h.addWidget(mk("開始", lambda _, x=id_: self.interval_start(x), "区間開始"), 1)
             h.addWidget(mk("終了", lambda _, x=id_: self.interval_end(x),   "区間終了"), 1)
             h.addWidget(mk("⋯",   lambda _, x=id_: self.interval_edit(x),   "区間編集"), 1)
-            h.addWidget(mk("➡",   lambda _, x=id_: self.jump_to_unassigned_frame(x), "未付与フレームへ"), 1)
 
             self.id_scroll_layout.addWidget(row)
 
