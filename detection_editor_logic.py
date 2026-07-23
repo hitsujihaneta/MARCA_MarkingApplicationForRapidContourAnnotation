@@ -1845,26 +1845,30 @@ class CoreLogicMixin:
         v = QtWidgets.QVBoxLayout(dlg)
         v.addWidget(QtWidgets.QLabel("保存形式を選択してください："))
         v.addSpacing(8)
-        btn_json = QtWidgets.QPushButton("JSON形式で保存（フレームごと）")
         btn_txt_bulk = QtWidgets.QPushButton("TXT形式で保存（一括ファイル）")
-        btn_txt_frame = QtWidgets.QPushButton("TXT形式で保存（フレームごと）")
+        btn_doc = QtWidgets.QPushButton("DOC形式で保存（DeepOCSORT用）")
+        btn_json = QtWidgets.QPushButton("JSON形式で保存（フレームごと）")
         btn_cancel = QtWidgets.QPushButton("キャンセル")
-        btn_cancel.setStyleSheet(
+        btn_style = (
             "QPushButton{background-color:#4a4a4a;color:#eee;border-radius:5px;padding:4px 16px;}"
             "QPushButton:hover{background-color:#666;}"
         )
-        for btn in [btn_json, btn_txt_bulk, btn_txt_frame]:
+        for btn in [btn_txt_bulk, btn_doc, btn_json, btn_cancel]:
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setStyleSheet(btn_style)
+        for btn in [btn_txt_bulk, btn_doc, btn_json]:
             btn.setMinimumHeight(36)
         btn_cancel.setMinimumHeight(32)
-        v.addWidget(btn_json)
         v.addWidget(btn_txt_bulk)
-        v.addWidget(btn_txt_frame)
+        v.addWidget(btn_doc)
+        v.addWidget(btn_json)
         v.addSpacing(4)
         v.addWidget(btn_cancel)
         dlg.setMinimumWidth(320)
-        btn_json.clicked.connect(lambda: (dlg.accept(), self.save_all_json()))
         btn_txt_bulk.clicked.connect(lambda: (dlg.accept(), self.save_all_txt()))
-        btn_txt_frame.clicked.connect(lambda: (dlg.accept(), self.save_all_txt_per_frame()))
+        btn_doc.clicked.connect(lambda: (dlg.accept(), self.save_as_deepocsort_txt()))
+        btn_json.clicked.connect(lambda: (dlg.accept(), self.save_all_json()))
         btn_cancel.clicked.connect(dlg.reject)
         dlg.exec_()
 
