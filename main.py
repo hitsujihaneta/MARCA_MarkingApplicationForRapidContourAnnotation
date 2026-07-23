@@ -152,6 +152,7 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         self.image_folder: str = ""
         self.last_txt_import_folder: str = ""  # 検出結果txtを読み込んだフォルダ（保存先のデフォルトに使用）
         self._last_save_time: Optional[float] = None  # 直近の保存成功時刻（終了時の保存確認に使用）
+        self._autosave_txt_timestamp: Optional[str] = None  # TXT自動保存のファイル名固定用（正式保存でリセット）
         self._initial_fit_done: bool = False
         self._min_zoom_scale: float = 0.0  # 初期フィット時のスケール（最小ズーム制限用）
 

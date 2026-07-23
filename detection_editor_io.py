@@ -32,9 +32,23 @@ class FileIOMixin:
             return None
         return os.path.join(folder, ".marca_autosave.json")
 
+    def _autosave_txt_path(self) -> Optional[str]:
+        """自動保存のTXT（一括ファイル）版のパス。
+        手動保存のデフォルト名（YYYYMMDD_HHMM.txt）と同じ命名規則に「_autosave」を付けたもの。
+        同一セッション中は同じファイルを上書きし続ける（15分ごとに新規ファイルが増え続けないように）。"""
+        folder = self.last_txt_import_folder or self.image_folder
+        if not folder:
+            return None
+        if not getattr(self, '_autosave_txt_timestamp', None):
+            self._autosave_txt_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+        return os.path.join(folder, f"{self._autosave_txt_timestamp}_autosave.txt")
+
     def _autosave_recovery(self):
         """一定間隔で自動的に呼ばれ、作業内容を裏で保存する。
-        バックグラウンド処理なので、失敗しても画面には出さない。"""
+        バックグラウンド処理なので、失敗しても画面には出さない。
+        内部形式(JSON)の復元用バックアップに加えて、予期しないエラーで正式な保存が
+        できないまま終了した場合でもそのまま使えるよう、手動保存と同じTXT一括形式でも
+        自動保存する。"""
         if not self.image_folder or not self.detections:
             return
         path = self._recovery_file_path()
@@ -52,6 +66,15 @@ class FileIOMixin:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
             os.replace(tmp_path, path)  # アトミックに置き換え、書き込み中のクラッシュでファイルが壊れないようにする
+
+            txt_path = self._autosave_txt_path()
+            if txt_path:
+                tmp_txt_path = txt_path + ".tmp"
+                with open(tmp_txt_path, "w", encoding="utf-8") as f:
+                    for frame_number in sorted(self.detections.keys()):
+                        for x, y, w, h, label in self.detections[frame_number]:
+                            f.write(f"{frame_number},{label},{x},{y},{w},{h}\n")
+                os.replace(tmp_txt_path, txt_path)
         except Exception:
             pass
 
@@ -62,6 +85,15 @@ class FileIOMixin:
                 os.remove(path)
             except Exception:
                 pass
+        if getattr(self, '_autosave_txt_timestamp', None):
+            txt_path = self._autosave_txt_path()
+            if txt_path and os.path.exists(txt_path):
+                try:
+                    os.remove(txt_path)
+                except Exception:
+                    pass
+        # 正式に保存したので、次回のTXT自動保存は新しいタイムスタンプで開始する
+        self._autosave_txt_timestamp = None
 
     def _check_recovery_on_load(self):
         """画像フォルダ読み込み時、自動保存の復元データが見つかれば復元するか確認する。"""
