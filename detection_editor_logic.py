@@ -1086,6 +1086,7 @@ class CoreLogicMixin:
         if target_id in self.id_list:
             self.id_list.remove(target_id)
         self.id_color_map.pop(target_id, None)
+        self.copy_target_ids.discard(target_id)
 
         self.load_image()
         self.rebuild_id_list_ui()
@@ -1825,8 +1826,42 @@ class CoreLogicMixin:
     # -------- フレーム移動（自動保存なし） --------
     def next_frame(self):
         if self.current_frame_index < len(self.image_paths) - 1:
+            old_frame_number = self.image_paths[self.current_frame_index][1]
             self.current_frame_index += 1
+            new_frame_number = self.image_paths[self.current_frame_index][1]
+            self._copy_mode_propagate(old_frame_number, new_frame_number)
             self.load_image()
+
+    def _on_copy_mode_toggled(self, checked: bool):
+        """コピーモードのON/OFF。OFFにする際は選択中のコピー対象をクリアする。"""
+        self.copy_mode = checked
+        if not checked:
+            self.copy_target_ids.clear()
+        self.rebuild_id_list_ui()
+
+    def _set_copy_target(self, id_str: str, checked: bool):
+        if checked:
+            self.copy_target_ids.add(id_str)
+        else:
+            self.copy_target_ids.discard(id_str)
+
+    def _copy_mode_propagate(self, old_frame_number: int, new_frame_number: int):
+        """コピーモードON時、Dキーで次フレームへ進む際にコピー対象IDの枠を
+        直前フレームと同じ位置・サイズでコピーする。コピー先に既にその
+        IDの枠がある場合は上書きせずスキップする。"""
+        if not getattr(self, 'copy_mode', False) or not self.copy_target_ids:
+            return
+        self._load_frame_if_needed(new_frame_number)
+        old_boxes = self.detections.get(old_frame_number, [])
+        new_boxes = self.detections.get(new_frame_number, [])
+        existing_labels = {b[4] for b in new_boxes}
+        copied = False
+        for x, y, w, h, label in old_boxes:
+            if label in self.copy_target_ids and label not in existing_labels:
+                new_boxes.append([x, y, w, h, label])
+                copied = True
+        if copied:
+            self.detections[new_frame_number] = new_boxes
 
     def prev_frame(self):
         if self.current_frame_index > 0:

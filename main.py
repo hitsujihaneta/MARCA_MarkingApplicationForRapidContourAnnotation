@@ -184,6 +184,8 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
         self.current_phase: int = 1  # 1〜4
         self.label_check_mode: bool = False  # ラベルチェックモード ON/OFF
         self.phase4_active: bool = False      # 追跡ズームモード ON/OFF
+        self.copy_mode: bool = False  # コピーモード ON/OFF（Dキーで次フレームへ枠を自動コピー）
+        self.copy_target_ids: set = set()  # コピーモードでコピー対象に選択されているIDのセット
 
         # ID
         self.id_list: List[str] = []

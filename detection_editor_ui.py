@@ -425,6 +425,12 @@ class UIBuilderMixin:
         add_v.addWidget(self.id_scroll, 20)
         add_v.addSpacing(self.dp(6))
 
+        # --- コピーモードトグル（ID一覧の下、常に表示） ---
+        self.copy_mode_toggle = QtWidgets.QCheckBox("コピー モード（Dキーで次フレームへ自動コピー）")
+        self.copy_mode_toggle.setFont(_sf)
+        self.copy_mode_toggle.toggled.connect(self._on_copy_mode_toggled)
+        add_v.addWidget(self.copy_mode_toggle, 0)
+
         # --- ラベルチェックトグル（ID一覧の下、常に表示） ---
         self.label_check_toggle = QtWidgets.QCheckBox("ラベル チェック")
         self.label_check_toggle.setFont(_sf)
@@ -754,6 +760,14 @@ class UIBuilderMixin:
             h = QtWidgets.QHBoxLayout(row)
             h.setContentsMargins(2, 1, 2, 1)
             h.setSpacing(4)
+
+            # コピー対象チェックボックス（コピーモードON時のみ表示）
+            if getattr(self, 'copy_mode', False):
+                copy_cb = QtWidgets.QCheckBox()
+                copy_cb.setChecked(id_ in self.copy_target_ids)
+                copy_cb.setToolTip("コピー対象にする（Dキーで次フレームへ自動コピー）")
+                copy_cb.toggled.connect(lambda checked, x=id_: self._set_copy_target(x, checked))
+                h.addWidget(copy_cb)
 
             # IDボタン（固定幅）
             btn = QtWidgets.QPushButton(str(id_))
