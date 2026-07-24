@@ -1969,7 +1969,11 @@ class CoreLogicMixin:
     def _startup_update_check_then_prompt(self):
         """起動時の更新チェック → アプリを再起動する場合以外は画像読み込みを促す。
         更新チェックで確認ダイアログが出ている間は、画像読み込みポップアップを
-        同時に出さないようにするため、更新チェックの完了を待ってから呼び出す。"""
+        同時に出さないようにするため、更新チェックの完了を待ってから呼び出す。
+        更新適用による自動再起動の直後であれば、まず直前の状態を復元し、
+        更新チェックや画像読み込み確認は行わない。"""
+        if self._restore_after_restart():
+            return
         restarting = self.check_for_updates(silent=True)
         if not restarting:
             self._prompt_initial_image_load()
@@ -2153,6 +2157,7 @@ class CoreLogicMixin:
             )
             return False
 
+        self._save_restart_state()
         QtWidgets.QMessageBox.information(self, "更新確認", "更新を適用しました。アプリを再起動します。")
         self._restart_app()
         return True

@@ -95,29 +95,33 @@ class FileIOMixin:
         # 正式に保存したので、次回のTXT自動保存は新しいタイムスタンプで開始する
         self._autosave_txt_timestamp = None
 
-    def _check_recovery_on_load(self):
-        """画像フォルダ読み込み時、自動保存の復元データが見つかれば復元するか確認する。"""
+    def _check_recovery_on_load(self, silent: bool = False) -> bool:
+        """画像フォルダ読み込み時、自動保存の復元データが見つかれば復元するか確認する。
+        silent=True の場合は確認せず即座に復元する（更新後の自動再起動時など、
+        中断ではなく意図した継続であることが分かっている場合に使う）。
+        戻り値: 実際に復元処理を行った場合True。"""
         path = self._recovery_file_path()
         if not path or not os.path.exists(path):
-            return
+            return False
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception:
-            return
+            return False
 
-        saved_at = data.get("saved_at")
-        when_text = ""
-        if saved_at:
-            when_text = datetime.datetime.fromtimestamp(saved_at).strftime("%Y-%m-%d %H:%M")
+        if not silent:
+            saved_at = data.get("saved_at")
+            when_text = ""
+            if saved_at:
+                when_text = datetime.datetime.fromtimestamp(saved_at).strftime("%Y-%m-%d %H:%M")
 
-        if not self._ask_confirm(
-            "自動保存データが見つかりました",
-            "保存されないまま終了した可能性がある作業内容が見つかりました"
-            f"{'（' + when_text + ' 時点）' if when_text else ''}。\n復元しますか？",
-            yes_text="復元する", no_text="復元しない",
-        ):
-            return
+            if not self._ask_confirm(
+                "自動保存データが見つかりました",
+                "保存されないまま終了した可能性がある作業内容が見つかりました"
+                f"{'（' + when_text + ' 時点）' if when_text else ''}。\n復元しますか？",
+                yes_text="復元する", no_text="復元しない",
+            ):
+                return False
 
         try:
             self.detections = {int(k): v for k, v in data.get("detections", {}).items()}
@@ -126,8 +130,97 @@ class FileIOMixin:
             self.hidden_ids = set(data.get("hidden_ids", []))
             self.loaded_frames = set(self.detections.keys())
             self.rebuild_id_list_ui()
+            return True
         except Exception as e:
             QtWidgets.QMessageBox.warning(self, "復元エラー", f"自動保存データの復元に失敗しました:\n{e}")
+            return False
+
+    # ================================================================
+    # 更新適用による自動再起動時の状態引き継ぎ
+    # ================================================================
+    def _restart_state_path(self) -> str:
+        return os.path.join(self._repo_root(), ".marca_restart_state.json")
+
+    def _save_restart_state(self):
+        """更新を適用してアプリを再起動する直前に呼ぶ。
+        直前まで開いていた画像フォルダ・検出結果の読み込み元・現在のフレーム位置を
+        記録しておき、再起動後に自動で復元できるようにする。作業内容そのものは
+        既存のクラッシュ復元用オートセーブ(.marca_autosave.json)を流用するため、
+        ここで最新の状態に更新しておく。"""
+        if not self.image_folder:
+            return
+        try:
+            self._autosave_recovery()
+            state = {
+                "image_folder": self.image_folder,
+                "last_txt_import_folder": self.last_txt_import_folder,
+                "current_frame_index": self.current_frame_index,
+            }
+            with open(self._restart_state_path(), "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def _restore_after_restart(self) -> bool:
+        """起動時に呼ぶ。更新適用による再起動直後であれば、直前のフォルダ・
+        読み込み元・作業内容・フレーム位置を自動で復元する。
+        戻り値: 復元処理を行った場合True（この場合、通常の初期読み込み確認ダイアログは出さない）。"""
+        path = self._restart_state_path()
+        if not os.path.exists(path):
+            return False
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception:
+            state = None
+        finally:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+        if not state:
+            return False
+
+        folder = state.get("image_folder")
+        if not folder or not os.path.isdir(folder):
+            return False
+
+        self.image_folder = folder
+        self.last_txt_import_folder = state.get("last_txt_import_folder", "") or ""
+
+        exts = ("*.jpg", "*.png", "*.jpeg")
+        image_paths = []
+        for e in exts:
+            for f in glob.glob(os.path.join(folder, e)):
+                name = os.path.basename(f)
+                digits = re.findall(r'\d+', name)
+                if digits:
+                    frame_number = int(digits[-1])
+                    image_paths.append((f, frame_number))
+        image_paths.sort(key=lambda x: x[1])
+        if not image_paths:
+            return False
+        self.image_paths = image_paths
+        self.current_frame_index = 0
+        self._initial_fit_done = False
+
+        # 作業内容(検出結果)は再起動直前に保存したオートセーブから無条件で復元する
+        self._check_recovery_on_load(silent=True)
+
+        frame_idx = state.get("current_frame_index")
+        if isinstance(frame_idx, int) and 0 <= frame_idx < len(self.image_paths):
+            self.current_frame_index = frame_idx
+
+        if hasattr(self, 'image_count_label'):
+            self.image_count_label.setText(f"画像数: {len(self.image_paths)}")
+
+        self.sidebar_stack.setCurrentIndex(1)
+        self.rebuild_id_list_ui()
+        self.update_mode_label()
+        self.setFocus()
+        self.load_image()
+        return True
 
     def _json_path_for_image(self, img_path: str):
         return os.path.splitext(img_path)[0] + ".json"
