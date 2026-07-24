@@ -426,7 +426,7 @@ class UIBuilderMixin:
         add_v.addSpacing(self.dp(6))
 
         # --- コピーモードトグル（ID一覧の下、常に表示） ---
-        self.copy_mode_toggle = QtWidgets.QCheckBox("コピー モード（Dキーで次フレームへ自動コピー）")
+        self.copy_mode_toggle = QtWidgets.QCheckBox("コピー モード（Ctrl+Dで次フレームへ自動コピー）")
         self.copy_mode_toggle.setFont(_sf)
         self.copy_mode_toggle.toggled.connect(self._on_copy_mode_toggled)
         add_v.addWidget(self.copy_mode_toggle, 0)
@@ -525,6 +525,7 @@ class UIBuilderMixin:
             ("J",               "フレームジャンプ入力欄へ移動"),
             ("Space",           "再生 / 停止"),
             ("Q",               "モード切替（選択 / 編集）"),
+            ("Ctrl+D",          "次フレームへ移動＋コピー対象IDの枠をコピー"),
             ("Ctrl+S",          "保存形式選択"),
             ("マウススクロール",        "ズーム"),
             ("右ドラック",        "視点移動"),
@@ -765,7 +766,7 @@ class UIBuilderMixin:
             if getattr(self, 'copy_mode', False):
                 copy_cb = QtWidgets.QCheckBox()
                 copy_cb.setChecked(id_ in self.copy_target_ids)
-                copy_cb.setToolTip("コピー対象にする（Dキーで次フレームへ自動コピー）")
+                copy_cb.setToolTip("コピー対象にする（Ctrl+Dで次フレームへ自動コピー）")
                 copy_cb.toggled.connect(lambda checked, x=id_: self._set_copy_target(x, checked))
                 h.addWidget(copy_cb)
 
