@@ -257,7 +257,10 @@ class CoreLogicMixin:
         except ValueError as e:
             print(f"[エラー] 速度変更エラー: {e}")
             pass
-    
+        # コンボボックスにフォーカスが残ったままだとSpaceキーが再生/停止ではなく
+        # コンボボックス自体の操作に食われてしまうため、メインウィンドウへ戻す
+        self.setFocus()
+
     def _on_show_all_changed(self, state):
         """全ID表示チェックボックスの状態変更"""
         if state == QtCore.Qt.Checked:
@@ -311,6 +314,9 @@ class CoreLogicMixin:
             self._phase4_on_activate()
         else:
             self._phase4_on_deactivate()
+        # チェックボックスにフォーカスが残るとSpaceキーがチェックの
+        # ON/OFFに食われてしまうため、メインウィンドウへ戻す
+        self.setFocus()
 
     def _on_label_check_toggled(self, checked: bool):
         """ラベルチェックトグル ON/OFF"""
@@ -323,6 +329,9 @@ class CoreLogicMixin:
         self.update_mode_label()
         if checked:
             self._update_label_check_indicator()
+        # チェックボックスにフォーカスが残るとSpaceキーがチェックの
+        # ON/OFFに食われてしまうため、メインウィンドウへ戻す
+        self.setFocus()
 
     def _update_label_check_indicator(self):
         """現在フレームのラベル数を確認し、インジケーター色とlc_tableのハイライトを更新する。
@@ -1861,12 +1870,16 @@ class CoreLogicMixin:
             self.copy_target_ids.clear()
         self.rebuild_id_list_ui()
         self._quick_redraw_boxes()
+        # チェックボックスにフォーカスが残るとSpaceキーがチェックの
+        # ON/OFFに食われてしまうため、メインウィンドウへ戻す
+        self.setFocus()
 
     def _set_copy_target(self, id_str: str, checked: bool):
         if checked:
             self.copy_target_ids.add(id_str)
         else:
             self.copy_target_ids.discard(id_str)
+        self.setFocus()
 
     def _draw_copy_mode_preview(self):
         """コピーモードON時、次フレームに存在する全ID分の枠を半透明のプレビューとして
