@@ -1693,10 +1693,10 @@ class CoreLogicMixin:
             self.toggle_play_pause()
             return
 
-        # Ctrl+D：次フレームへ移動＋コピー対象IDの枠をコピー（Phase1/2）
+        # C：次フレームへ移動＋コピー対象IDの枠をコピー（Phase1/2）
         if (self.current_phase != 3
-                and event.key() == QtCore.Qt.Key_D
-                and event.modifiers() == QtCore.Qt.ControlModifier):
+                and event.key() == QtCore.Qt.Key_C
+                and event.modifiers() == QtCore.Qt.NoModifier):
             self.next_frame_with_copy()
             if getattr(self, 'phase4_active', False):
                 self._phase4_apply_zoom()
@@ -1846,7 +1846,7 @@ class CoreLogicMixin:
             self.load_image()
 
     def next_frame_with_copy(self):
-        """Ctrl+D: 次フレームへ移動し、コピー対象に選択中のIDの枠を直前フレームからコピーする。"""
+        """C: 次フレームへ移動し、コピー対象に選択中のIDの枠を直前フレームからコピーする。"""
         if self.current_frame_index < len(self.image_paths) - 1:
             old_frame_number = self.image_paths[self.current_frame_index][1]
             self.current_frame_index += 1
@@ -1896,7 +1896,7 @@ class CoreLogicMixin:
             text_item.setAcceptedMouseButtons(QtCore.Qt.NoButton)
 
     def _copy_mode_propagate(self, old_frame_number: int, new_frame_number: int):
-        """コピーモードON時、Ctrl+Dで次フレームへ進む際にコピー対象IDの枠を
+        """コピーモードON時、Cキーで次フレームへ進む際にコピー対象IDの枠を
         直前フレームと同じ位置・サイズでコピーする。コピー先に既にその
         IDの枠がある場合は上書きせずスキップする。"""
         if not getattr(self, 'copy_mode', False) or not self.copy_target_ids:
