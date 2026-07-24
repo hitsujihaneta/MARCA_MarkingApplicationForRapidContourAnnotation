@@ -2143,8 +2143,13 @@ class CoreLogicMixin:
         _, log, _ = self._run_git("log", "--oneline", f"{local_hash}..{remote_hash}", cwd=root)
         n_commits = len(log.splitlines()) if log else 0
 
-        # 未コミットの変更があると更新で壊れる可能性があるため、pull前にチェックする
-        _, dirty, _ = self._run_git("status", "--porcelain", cwd=root)
+        # 未コミットの変更があると更新で壊れる可能性があるため、pull前にチェックする。
+        # 未追跡ファイル（??）は git pull --ff-only を妨げないので対象外にする
+        # （追跡対象ファイルへの変更だけを「未コミットの変更」として扱う）。
+        _, status_out, _ = self._run_git("status", "--porcelain", cwd=root)
+        dirty = "\n".join(
+            line for line in status_out.splitlines() if not line.startswith("??")
+        )
         if dirty:
             if not silent:
                 QtWidgets.QMessageBox.warning(
