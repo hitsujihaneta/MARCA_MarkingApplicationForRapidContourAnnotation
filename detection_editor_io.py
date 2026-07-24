@@ -128,7 +128,9 @@ class FileIOMixin:
             self.detections = {int(k): v for k, v in data.get("detections", {}).items()}
             self.id_list = data.get("id_list", self.id_list)
             self.id_intervals = data.get("id_intervals", self.id_intervals)
-            self.hidden_ids = set(data.get("hidden_ids", []))
+            # 追跡フェーズと共有しているセットなので、再代入せず中身だけ入れ替える
+            self.hidden_ids.clear()
+            self.hidden_ids.update(data.get("hidden_ids", []))
             self.loaded_frames = set(self.detections.keys())
             self.rebuild_id_list_ui()
             return True
@@ -814,6 +816,14 @@ class FileIOMixin:
         if not folder:
             return
         self.image_folder = folder
+
+        # 新しい画像フォルダを読み込む際、前回のセッションで付けっぱなしになっていた
+        # コピーモード（次フレームのプレビュー表示）が残っていると紛らわしいのでリセットする
+        if hasattr(self, 'copy_mode_toggle'):
+            self.copy_mode_toggle.setChecked(False)
+        else:
+            self.copy_mode = False
+            self.copy_target_ids.clear()
 
         # 進捗ダイアログ
         progress = QtWidgets.QProgressDialog(

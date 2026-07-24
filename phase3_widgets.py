@@ -44,6 +44,7 @@ class P3ImageView(QGraphicsView):
         self._det_store: Optional[Dict] = None      # store.detections への参照
         self._orig_frames: List[int] = []           # internal_index → original_frame_number
         self._label_colors: Dict[str, QColor] = {}  # label文字列 → QColor
+        self.hidden_ids: set = set()                # 非表示にするIDのセット（検出フェーズと共有）
         self._right_dragging = False
         self._last_pan_pos = None
         self._initial_fit_done = False
@@ -56,7 +57,7 @@ class P3ImageView(QGraphicsView):
         self.grabGesture(Qt.PinchGesture)
 
     def set_sources(self, images, boxes_by_frame, lane_colors, lane_labels=None,
-                    det_store=None, orig_frames=None, label_colors=None):
+                    det_store=None, orig_frames=None, label_colors=None, hidden_ids=None):
         self.images = images
         self.boxes_by_frame = boxes_by_frame
         self.lane_colors = lane_colors
@@ -65,6 +66,8 @@ class P3ImageView(QGraphicsView):
         self._det_store    = det_store
         self._orig_frames  = orig_frames or []
         self._label_colors = label_colors or {}
+        if hidden_ids is not None:
+            self.hidden_ids = hidden_ids
         self._initial_fit_done = False
 
     def set_frame(self, f: int):
@@ -118,24 +121,30 @@ class P3ImageView(QGraphicsView):
                     if len(item) < 5:
                         continue
                     x, y, w, h, label = item[0], item[1], item[2], item[3], str(item[4])
+                    is_hidden = label in self.hidden_ids
                     color = self._label_colors.get(label, QColor("white"))
                     pen = QPen(color, 2)
                     ri = sc.addRect(float(x), float(y), float(w), float(h), pen)
+                    if is_hidden:
+                        ri.setOpacity(0.4)
                     self._box_items.append(ri)
-                    if not self._playing:  # 再生中はラベル描画をスキップ
+                    if not self._playing and not is_hidden:  # 再生中・非表示IDはラベル描画をスキップ
                         self._draw_id_tag(sc, float(x), float(y), label, color)
             return
 
         # ── フォールバック（従来の boxes_by_frame 方式）──────────────────────
         boxes = self.boxes_by_frame.get(self.current_frame, [])
         for bx in boxes:
+            label = self.lane_labels.get(bx.lane_index, str(bx.lane_index))
+            is_hidden = str(label) in self.hidden_ids
             color = self.lane_colors.get(bx.lane_index, QColor("white"))
             x1, y1, x2, y2 = bx.rect
             pen = QPen(color, 2)
             ri = sc.addRect(x1, y1, x2 - x1, y2 - y1, pen)
+            if is_hidden:
+                ri.setOpacity(0.4)
             self._box_items.append(ri)
-            if not self._playing:  # 再生中はラベル描画をスキップ
-                label = self.lane_labels.get(bx.lane_index, str(bx.lane_index))
+            if not self._playing and not is_hidden:  # 再生中・非表示IDはラベル描画をスキップ
                 self._draw_id_tag(sc, x1, y1, str(label), color)
 
     def _draw_id_tag(self, sc, x: float, y: float, label: str, color: QColor):
@@ -227,6 +236,7 @@ class P3ImageView(QGraphicsView):
 class P3Timeline(QGraphicsView):
     scrubToFrame      = pyqtSignal(int)
     swapRequested     = pyqtSignal(int, int, int, int)
+    visibilityToggled = pyqtSignal()
 
     def __init__(self, total_frames: int, fps: float, lanes: List[Lane], parent=None):
         super().__init__(parent)
@@ -238,11 +248,14 @@ class P3Timeline(QGraphicsView):
 
         self.row_height = 26
         self.margin_top = 30
-        self.margin_left = 80
+        self.margin_left = 96
         self.visible_rows = 12
         self.max_visible_frames = 200
         self.pixels_per_frame = 8.0
         self._user_ppf: Optional[float] = None  # ユーザーによるズーム上書き値
+        self.hidden_ids: set = set()  # 非表示にするIDのセット（検出フェーズと共有）
+        self._toggle_w = 26
+        self._toggle_h = 14
 
         self._occlusions: set = set()
         self.cut_mode = False
@@ -547,9 +560,8 @@ class P3Timeline(QGraphicsView):
         painter.setPen(QPen(QColor(255, 60, 60), 2))
         painter.drawLine(int(px_vp), 0, int(px_vp), band_h)
 
-        # ─── 各レーンのIDラベル（ルーラー帯より下にクリップして被りを防ぐ）
+        # ─── 各レーンのIDラベル＋表示/非表示トグル（ルーラー帯より下にクリップして被りを防ぐ）
         painter.setClipRect(QRectF(0, band_h, col_w, vh - band_h))
-        painter.setPen(QColor(200, 200, 200))
         font_id = QFont(); font_id.setPointSize(11)
         painter.setFont(font_id)
         for i, lane in enumerate(self.lanes):
@@ -557,19 +569,62 @@ class P3Timeline(QGraphicsView):
             y_vp    = self.mapFromScene(0, y_scene).y()
             if y_vp + self.row_height < band_h or y_vp > vh:
                 continue
-            painter.drawText(QRectF(2, y_vp, col_w - 4, self.row_height),
+            painter.setPen(QColor(200, 200, 200))
+            text_w = col_w - self._toggle_w - 10
+            painter.drawText(QRectF(2, y_vp, text_w, self.row_height),
                              Qt.AlignVCenter | Qt.AlignLeft, f"  ID {lane.id_value}")
+            self._paint_toggle(painter, self._toggle_rect_for_lane(y_vp), lane.id_value not in self.hidden_ids, lane.color)
         painter.setClipping(False)
 
         painter.restore()
+
+    def _toggle_rect_for_lane(self, y_vp: float) -> QRectF:
+        """行ヘッダー内、表示/非表示トグルのビューポート座標での矩形。"""
+        x = self.margin_left - self._toggle_w - 4
+        y = y_vp + (self.row_height - self._toggle_h) / 2
+        return QRectF(x, y, self._toggle_w, self._toggle_h)
+
+    def _paint_toggle(self, painter: QPainter, rect: QRectF, checked: bool, color: QColor):
+        """検出フェーズのIDVisibilityToggleと同じ見た目（右=表示/不透明、左=非表示/半透明）のスイッチを描画する。"""
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(70, 70, 70))
+        painter.drawRoundedRect(rect, rect.height() / 2, rect.height() / 2)
+
+        knob_d = rect.height() - 4
+        knob_travel = rect.width() - knob_d - 4
+        knob_x = rect.x() + (2 + knob_travel if checked else 2)
+        knob_y = rect.y() + 2
+        knob_color = QColor(color)
+        knob_color.setAlpha(255 if checked else 102)
+        painter.setBrush(knob_color)
+        painter.drawEllipse(QRectF(knob_x, knob_y, knob_d, knob_d))
 
     def scrollContentsBy(self, dx, dy):
         """スクロール時に左固定カラム（drawForeground）を必ず再描画"""
         super().scrollContentsBy(dx, dy)
         self.viewport().update()
 
+    def _try_toggle_click(self, pos) -> bool:
+        """行ヘッダー内クリックが表示/非表示トグルに当たっていれば、そのIDの
+        hidden_idsを切り替えて再描画する。検出フェーズと同じ共有セットを直接
+        書き換えるので、両フェーズに即座に反映される。"""
+        for i, lane in enumerate(self.lanes):
+            y_scene = self.margin_top + i * self.row_height
+            y_vp = self.mapFromScene(0, y_scene).y()
+            if self._toggle_rect_for_lane(y_vp).contains(pos):
+                if lane.id_value in self.hidden_ids:
+                    self.hidden_ids.discard(lane.id_value)
+                else:
+                    self.hidden_ids.add(lane.id_value)
+                self.viewport().update()
+                self.visibilityToggled.emit()
+                return True
+        return False
+
     def mousePressEvent(self, e):
         if e.pos().x() < self.margin_left:
+            if e.button() == Qt.LeftButton and self._try_toggle_click(e.pos()):
+                return
             return super().mousePressEvent(e)
 
         scene_pos = self.mapToScene(e.pos())
@@ -691,7 +746,7 @@ class P3Timeline(QGraphicsView):
 # =====================================================================
 # P3ControlPanel（タブ形式コントロールパネル）
 # =====================================================================
-_P3_SPEED_FACTORS = {"0.25x": 0.25, "0.5x": 0.5, "1x": 1.0, "2x": 2.0, "3x": 3.0, "4x": 4.0}
+_P3_SPEED_FACTORS = {"0.5x": 0.5, "1x": 1.0, "2x": 2.0, "3x": 3.0, "4x": 4.0, "5x": 5.0}
 
 class P3ControlPanel(QWidget):
     """Phase3用コントロールパネル（再生系左・編集系右の一列レイアウト）"""
@@ -845,9 +900,12 @@ class Phase3Widget(QWidget):
         self.mainView = P3ImageView(self)
         self.ctrl     = P3ControlPanel(self)
         self.timeline = P3Timeline(self.total_frames, self.fps, self.lanes, parent=self)
+        # 検出フェーズと同じhidden_idsセットを共有参照する（コピーではなく同じオブジェクト）
+        self.timeline.hidden_ids = self.store.hidden_ids
 
         self.timeline.scrubToFrame.connect(self._on_scrub)
         self.timeline.swapRequested.connect(self._on_swap)
+        self.timeline.visibilityToggled.connect(self.mainView._render_boxes)
 
         bottom = QWidget()
         bl = QVBoxLayout(bottom)
@@ -1028,11 +1086,15 @@ class Phase3Widget(QWidget):
         lane_colors  = {i: ln.color    for i, ln in enumerate(self._lanes_all)}
         lane_labels  = {i: ln.id_value for i, ln in enumerate(self._lanes_all)}
         label_colors = {ln.id_value: ln.color for ln in self._lanes_all}
+        # 検出フェーズと共有しているhidden_idsセットの参照を、切り替え時に取り直す
+        # （検出フェーズ側で再代入されていても、常に最新の共有オブジェクトを参照する）
+        self.timeline.hidden_ids = self.store.hidden_ids
         self.mainView.set_sources(
             self.images, self.boxes_by_frame, lane_colors, lane_labels,
             det_store=self.store.detections,
             orig_frames=self.original_frame_numbers,
             label_colors=label_colors,
+            hidden_ids=self.store.hidden_ids,
         )
         self.timeline.update_model(self.total_frames, self.lanes)
         self.timeline.set_occlusions(self.auto_occluded if self.show_occlusion else set())
@@ -1106,10 +1168,16 @@ class Phase3Widget(QWidget):
     def _on_jump(self):
         text = self.ctrl.jumpEdit.text().strip()
         if not text.isdigit():
+            QtWidgets.QMessageBox.warning(self, "入力エラー", "フレーム番号は整数で入力してください。")
             return
         frame_1based = int(text)
-        frame_0based = max(0, min(frame_1based - 1, self.total_frames - 1))
-        self._seek(frame_0based)
+        if not (1 <= frame_1based <= self.total_frames):
+            QtWidgets.QMessageBox.warning(
+                self, "入力エラー",
+                f"フレーム番号は1〜{self.total_frames}の範囲で入力してください。"
+            )
+            return
+        self._seek(frame_1based - 1)
         self.ctrl.jumpEdit.clear()
         self.ctrl.jumpEdit.clearFocus()
 

@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 .claude/settings.local.json
+.marca_last_session.json
+.marca_restart_state.json
+.marca_autosave.json
+.marca_autosave.json.tmp

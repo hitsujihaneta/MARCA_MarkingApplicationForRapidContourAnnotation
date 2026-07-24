@@ -65,6 +65,14 @@ class DetectionEditor(UIBuilderMixin, FileIOMixin, CoreLogicMixin, QtWidgets.QWi
     def id_color_map(self, val: Dict[str, int]):
         self.store.id_color_map = val
 
+    @property
+    def hidden_ids(self) -> set:
+        return self.store.hidden_ids
+
+    @hidden_ids.setter
+    def hidden_ids(self, val: set):
+        self.store.hidden_ids = val
+
     def __init__(self):
         super().__init__()
         # ストアを最初に生成（プロパティアクセスより前に必要）

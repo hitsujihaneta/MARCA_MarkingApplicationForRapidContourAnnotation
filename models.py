@@ -145,3 +145,4 @@ class EditorStore:
         self.image_folder: str = ""
         self.shared_frame: int = 0  # フェーズ間で共有するフレーム番号（原フレーム番号）
         self.id_color_map: Dict[str, int] = {}  # ID→パレット色番号（検出・追跡フェーズで共有し、同じIDは同じ色にする）
+        self.hidden_ids: set = set()  # 非表示にするIDのセット（検出・追跡フェーズで共有）
